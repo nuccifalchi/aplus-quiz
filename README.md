@@ -13,8 +13,8 @@ The home screen is a motherboard. Every part does something:
 
 | On the board | What it does |
 |---|---|
-| **A part** (network jack, CPU, RAM, 24-pin power plug, coin battery) | Zooms in on that exam domain. Its fine print shows your accuracy, mastery, and weakest objective. Press the part again to practice 10 questions from that domain; tap anywhere else to zoom out |
-| **Debug LEDs** | One row per domain. The bar shows how many questions you've mastered, and the weakest domain's LED blinks amber. Tap a row to zoom to its part |
+| **A part** (network jack, CPU, RAM, 24-pin power plug, coin battery) | Flies into that exam domain's page: a close-up of the part, your stats, and a datasheet of its objectives. Tap an objective to study it, or practice the whole domain |
+| **Debug LED** next to each part | Blinks amber on your weakest domain and glows white once you've mastered 70% of a domain |
 | **PWR** (orange button) | Starts a Quick 10: mixed questions weighted like the real exam, favoring ones you missed or haven't seen |
 | **RST** | Reviews the questions you got wrong last time |
 | **Q-code display** | Your overall accuracy. Tap it for the full POST report and to reset progress |
@@ -57,9 +57,10 @@ To add a whole new file (for example, the Core 2 domains later), create it in `q
 
 ```
 index.html             the page
-css/                   style.css (base), board.css, card.css, exam.css, fonts.css
+css/                   style.css (base), board.css, part.css, card.css, exam.css, fonts.css
 js/engine.js           question data, picking, and stats
-js/board.js            the motherboard home screen and zoom camera
+js/board.js            the motherboard home screen, boot sequence, and fly-in
+js/part.js             a part's page: close-up and objectives datasheet
 js/card.js             inspection cards, the report, and the POST receipt
 js/exam.js             Exam Mode
 js/app.js              screen routing and keyboard shortcuts
