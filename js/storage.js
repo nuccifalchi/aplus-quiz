@@ -4,7 +4,9 @@ const Store = (() => {
   const KEY = "aplusQuiz.v1";
   const MAX_SESSIONS = 100;
 
-  const empty = () => ({ version: 1, questions: {}, sessions: [] });
+  const DEFAULT_SETTINGS = { examDate: "2026-11-07", examMode: false, hintSeen: false };
+
+  const empty = () => ({ version: 1, questions: {}, sessions: [], settings: { ...DEFAULT_SETTINGS } });
 
   let data = load();
 
@@ -12,6 +14,7 @@ const Store = (() => {
     try {
       const parsed = JSON.parse(localStorage.getItem(KEY));
       if (parsed && parsed.version === 1 && parsed.questions && Array.isArray(parsed.sessions)) {
+        parsed.settings = { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) };
         return parsed;
       }
     } catch (e) { /* fall through */ }
@@ -48,8 +51,18 @@ const Store = (() => {
       save();
     },
 
+    settings: () => data.settings,
+
+    setSetting(key, value) {
+      data.settings[key] = value;
+      save();
+    },
+
+    // Clears scores and missed questions; keeps settings like the exam date.
     reset() {
+      const settings = data.settings;
       data = empty();
+      data.settings = settings;
       save();
     },
 
