@@ -5,13 +5,13 @@ const Engine = (() => {
   const byId = new Map(allQuestions.map(q => [q.id, q]));
 
   // Each domain lives on a physical part of the board (see CLAUDE.md).
-  // cx/cy: zoom center in board coordinates. zoom: camera scale. focus: sharp radius.
+  // cx/cy: the part's center in board coordinates (the camera zooms there).
   const PARTS = {
-    mob:  { domain: "1.0", led: "BATT", name: "1.0 MOBILE DEVICES",         label: "MOBILE",          cx: 60,  cy: 858, zoom: 2.8, focus: 52 },
-    net:  { domain: "2.0", led: "LAN",  name: "2.0 NETWORKING",             label: "NETWORKING",      cx: 88,  cy: 40,  zoom: 2.4, focus: 80 },
-    hw:   { domain: "3.0", led: "CPU",  name: "3.0 HARDWARE",               label: "HARDWARE",        cx: 158, cy: 186, zoom: 2.2, focus: 96 },
-    virt: { domain: "4.0", led: "DRAM", name: "4.0 VIRTUALIZATION & CLOUD", label: "VIRT & CLOUD",    cx: 294, cy: 440, zoom: 2.4, focus: 70 },
-    ts:   { domain: "5.0", led: "BOOT", name: "5.0 TROUBLESHOOTING",        label: "TROUBLESHOOTING", cx: 352, cy: 318, zoom: 2.4, focus: 66 },
+    mob:  { domain: "1.0", led: "BATT", name: "1.0 MOBILE DEVICES",         ref: "BAT1",    cx: 74,  cy: 488 },
+    net:  { domain: "2.0", led: "LAN",  name: "2.0 NETWORKING",             ref: "LAN1",    cx: 92,  cy: 46 },
+    hw:   { domain: "3.0", led: "CPU",  name: "3.0 HARDWARE",               ref: "CPU1",    cx: 132, cy: 250 },
+    virt: { domain: "4.0", led: "DRAM", name: "4.0 VIRTUALIZATION & CLOUD", ref: "DIMM",    cx: 292, cy: 266 },
+    ts:   { domain: "5.0", led: "BOOT", name: "5.0 TROUBLESHOOTING",        ref: "ATXPWR1", cx: 353, cy: 228 },
   };
   const PART_ORDER = ["mob", "net", "hw", "virt", "ts"];
   const partForDomain = id => PART_ORDER.find(k => PARTS[k].domain === id);
@@ -92,6 +92,17 @@ const Engine = (() => {
     return worst ? `${worst.id} ${OBJECTIVES[worst.id] || ""}`.trim() : null;
   }
 
+  const questionsForObjective = id => allQuestions.filter(q => q.objective === id);
+
+  // Every sub-objective of a domain (from the exam objectives), with its stats.
+  function objectivesIn(domainId) {
+    const prefix = domainId.split(".")[0] + ".";
+    const ids = Object.keys(OBJECTIVES).filter(k => k.startsWith(prefix));
+    questionsIn(domainId).forEach(q => { if (q.objective && !ids.includes(q.objective)) ids.push(q.objective); });
+    ids.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return ids.map(id => ({ id, name: OBJECTIVES[id] || "Objective " + id, ...stats(questionsForObjective(id)) }));
+  }
+
   function weightedPick(pool, count) {
     const picked = [];
     pool = pool.slice();
@@ -154,6 +165,6 @@ const Engine = (() => {
   return {
     domains, allQuestions, byId, PARTS, PART_ORDER, OBJECTIVES, partForDomain,
     esc, pct, answersOf, shuffle, isMissed, stats, domainById, questionsIn,
-    weakestDomain, weakestObjective, pickQuick, pickFrom, pickExam, daysUntil,
+    weakestDomain, weakestObjective, objectivesIn, questionsForObjective, pickQuick, pickFrom, pickExam, daysUntil,
   };
 })();
