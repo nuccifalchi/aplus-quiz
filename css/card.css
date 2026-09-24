@@ -6,6 +6,7 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: calc(14px + env(safe-area-inset-top)) 12px calc(24px + env(safe-area-inset-bottom));
+  background: radial-gradient(120% 70% at 30% 0%, #1a1a19, var(--case) 70%);
   animation: lay-down .45s cubic-bezier(.2, .7, .2, 1);
 }
 @keyframes lay-down { from { opacity: 0; transform: translate(-6px, -10px) rotate(-1deg); } }

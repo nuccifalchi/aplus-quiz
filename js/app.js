@@ -1,15 +1,18 @@
-// Router: ties the board, the paper cards, and Exam Mode together.
+// Router: ties the board, part pages, paper cards, and Exam Mode together.
 // Routes live in the URL hash so the phone's Back gesture works:
-//   #/            the board          #/part/<key>  zoomed on a part
-//   #/card        study card         #/report      POST report receipt
-//   #/exam        Exam Mode
+//   #/              the board (home)
+//   #/part/<key>    a part's page: close-up + objectives datasheet
+//   #/card          study card          #/report   POST report receipt
+//   #/exam          Exam Mode
 (() => {
   const root = document.getElementById("app");
-  const { PARTS, partForDomain, questionsIn } = Engine;
+  const { PARTS } = Engine;
 
   let route = null;
-  let zoomedFromHome = false;
   let pendingFlash = null;
+  // True when we pushed the current screen from the previous one, so "back"
+  // can use history.back() and the phone's history stays tidy.
+  const pushed = { part: false, card: false, report: false };
 
   const parse = () => {
     const h = location.hash.replace(/^#\/?/, "");
@@ -18,25 +21,17 @@
   };
   const go = hash => { if (location.hash !== hash) location.hash = hash; else render(); };
   const replace = hash => { history.replaceState(null, "", hash); render(); };
+  const leave = (name, fallback = "#/") => { if (pushed[name]) history.back(); else replace(fallback); };
 
   function startStudy(mode, questions, label) {
     Board.markHintSeen();
-    if (Card.start(mode, questions, label)) go("#/card");
+    if (Card.start(mode, questions, label)) { pushed.card = true; go("#/card"); }
   }
 
   Board.mount(root, {
-    zoom(key) {
+    part(key) {
       Board.markHintSeen();
-      zoomedFromHome = true;
-      go(`#/part/${key}`);
-    },
-    zoomOut() {
-      if (zoomedFromHome) history.back();
-      else replace("#/");
-    },
-    practice(key) {
-      const p = PARTS[key];
-      startStudy("domain", Engine.pickFrom(questionsIn(p.domain), 10), `Practice: ${Engine.domainById(p.domain).name}`);
+      Board.enterPart(key).then(() => { pushed.part = true; go(`#/part/${key}`); });
     },
     start() {
       if (Store.settings().examMode) { Board.markHintSeen(); go("#/exam"); }
@@ -45,15 +40,19 @@
     review() {
       startStudy("missed", Engine.allQuestions.filter(Engine.isMissed), "Review missed");
     },
-    report() { go("#/report"); },
+    report() { pushed.report = true; go("#/report"); },
+  });
+
+  Part.mount(root, {
+    back() { leave("part"); },
+    study(mode, questions, label) { startStudy(mode, questions, label); },
   });
 
   Card.mount(root, {
-    exit() { go("#/"); },
+    exit() { leave(route.name === "report" ? "report" : "card"); },
     finished(score) { pendingFlash = score; },
-    missed(key) { Board.pulseLed(key); },
-    focusDomain(id) { Board.zoom(partForDomain(id), { blurAll: true }); },
-    restart() { Board.zoom(partForDomain(Card.currentDomain()), { blurAll: true }); Card.renderCard(); },
+    restart() { Card.renderCard(); },
+    reset() { pendingFlash = null; Board.clearFlash(); },
   });
 
   Exam.mount(root, {
@@ -63,48 +62,47 @@
 
   function render() {
     const next = parse();
+    const prev = route;
 
     // Leaving an exam in progress loses it, so ask first.
-    if (route && route.name === "exam" && next.name !== "exam" && Exam.inProgress()) {
+    if (prev && prev.name === "exam" && next.name !== "exam" && Exam.inProgress()) {
       if (!confirm("Leave the exam? Your answers so far won't be scored.")) {
         history.replaceState(null, "", "#/exam");
         return;
       }
       Exam.abandon();
     }
-    if (route && route.name === "card" && next.name !== "card") Card.endSession();
+    if (prev && prev.name === "card" && next.name !== "card") { Card.endSession(); pushed.card = false; }
+    if (prev && prev.name === "report" && next.name !== "report") pushed.report = false;
+    if (prev && prev.name === "part" && next.name !== "part" && next.name !== "card") pushed.part = false;
     route = next;
 
-    if (next.name === "exam") {
-      Card.close();
-      Board.show(false);
-      Exam.open();
-      return;
-    }
-    Exam.close();
-    Board.show(true);
+    if (next.name !== "exam") Exam.close();
+    if (next.name !== "part") Part.close();
+    if (next.name !== "card" && next.name !== "report") Card.close();
+
+    if (next.name === "exam") { Board.show(false); Exam.open(); return; }
 
     if (next.name === "card") {
       if (!Card.hasSession()) return replace("#/");
-      Board.zoom(partForDomain(Card.currentDomain()), { blurAll: true });
+      Board.show(false);
       Card.renderCard();
       return;
     }
-    if (next.name === "report") {
-      Board.zoom("post", { blurAll: true });
-      Card.renderReceipt();
+    if (next.name === "report") { Board.show(false); Card.renderReceipt(); return; }
+
+    if (next.name === "part") {
+      if (!PARTS[next.arg]) return replace("#/");
+      Board.show(false);
+      Part.open(next.arg);
       return;
     }
 
-    Card.close();
-    Board.refresh();
-    if (next.name === "part" && PARTS[next.arg]) {
-      Board.zoom(next.arg);
-      return;
-    }
     if (next.name !== "home") return replace("#/");
-    zoomedFromHome = false;
-    Board.zoom(null);
+    Board.show(true);
+    Board.refresh();
+    if (prev && prev.name === "part" && PARTS[prev.arg]) Board.exitPart(prev.arg);
+    else Board.reset();
     if (pendingFlash !== null) { Board.flashScore(pendingFlash); pendingFlash = null; }
   }
 
@@ -117,8 +115,9 @@
   document.addEventListener("keydown", e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "Escape") {
-      if (route.name === "part") { e.preventDefault(); return zoomedFromHome ? history.back() : replace("#/"); }
-      if (route.name === "card" || route.name === "report") { e.preventDefault(); return go("#/"); }
+      if (route.name === "part") { e.preventDefault(); return leave("part"); }
+      if (route.name === "card") { e.preventDefault(); return leave("card"); }
+      if (route.name === "report") { e.preventDefault(); return leave("report"); }
       return;
     }
     if (route.name === "card" && Card.onKey(e)) e.preventDefault();
@@ -126,4 +125,5 @@
   });
 
   render();
+  if (route.name === "home") Board.boot();
 })();

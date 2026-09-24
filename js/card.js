@@ -1,4 +1,4 @@
-// Paper that lies on the board: the inspection card (study questions), the
+// Paper on the workbench: the inspection card (study questions), the
 // inspection report (results), and the POST report receipt (stats).
 const Card = (() => {
   const { esc, pct, answersOf, shuffle, PARTS, PART_ORDER, OBJECTIVES, stats, questionsIn } = Engine;
@@ -124,7 +124,6 @@ const Card = (() => {
     item.correct = right.length === item.picked.length && right.every(a => item.picked.includes(a));
     item.done = true;
     Store.recordAnswer(item.q.id, item.correct);
-    if (!item.correct) handlers.missed(Engine.partForDomain(item.q.domainId));
     renderCard();
   }
 
@@ -132,7 +131,6 @@ const Card = (() => {
     if (!session) return;
     if (session.index < session.items.length - 1) {
       session.index += 1;
-      handlers.focusDomain(current().q.domainId);
       renderCard();
     } else {
       finish();
@@ -253,6 +251,7 @@ const Card = (() => {
     } else if (a === "reset") {
       if (confirm("Erase all scores and missed questions on this device? Your exam date stays. This can't be undone.")) {
         Store.reset();
+        handlers.reset();
         handlers.exit();
       }
     }
